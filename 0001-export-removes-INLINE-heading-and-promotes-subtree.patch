@@ -1,0 +1,61 @@
+From 5a41eae2af24097ec9c1507926af6f6fab8f2628 Mon Sep 17 00:00:00 2001
+From: Eric Schulte <schulte.eric@gmail.com>
+Date: Thu, 12 Jun 2014 16:11:04 -0400
+Subject: [PATCH] export removes INLINE heading and promotes subtree
+
+* lisp/ox.el (org-export-remove-and-promote-children-of-inline-headlines):
+  A new function.
+  (org-export-as): Include
+  `org-export-remove-and-promote-children-of-inline-headlines' in the
+  export process.
+---
+ lisp/ox.el | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/lisp/ox.el b/lisp/ox.el
+index 4bfef52..961d795 100644
+--- a/lisp/ox.el
++++ b/lisp/ox.el
+@@ -2320,6 +2320,29 @@ tree is modified by side effect and returned by the function."
+ 		(plist-get info prop)
+ 		info))))
+ 
++(defun org-export-remove-and-promote-children-of-inline-headlines (data info)
++  "Remove inline headlines and promote their children.
++DATA is the parse tree.  INFO is a plist containing export
++options.  Each headline tagged as INLINE will be removed
++retaining its contents, and promoting any children headlines by a
++single level."
++  (org-element-map data org-element-all-elements
++    (lambda (object)
++      (when (and (equal 'headline (org-element-type object))
++                 (or (member "inline" (org-element-property :tags object))
++		     (member "INLINE" (org-element-property :tags object))))
++        (mapc (lambda (el)
++                ;; recursively promote all nested headlines
++                (org-element-map el 'headline
++                  (lambda (el)
++                    (when (equal 'headline (org-element-type el))
++                      (org-element-put-property el
++                        :level (1- (org-element-property :level el))))))
++                (org-element-insert-before el object))
++              (cddr object))
++        (org-element-extract-element object)))
++    info nil org-element-all-elements))
++
+ (defun org-export--remove-uninterpreted-data-1 (data info)
+   "Change uninterpreted elements back into Org syntax.
+ DATA is a parse tree or a secondary string.  INFO is a plist
+@@ -3124,6 +3147,9 @@ Return code as a string."
+ 	 ;; Handle left-over uninterpreted elements or objects in
+ 	 ;; parse tree and communication channel.
+ 	 (org-export-remove-uninterpreted-data tree info)
++	 ;; Remove headlines tagged as inline and promote their
++	 ;; children.
++	 (org-export-remove-and-promote-children-of-inline-headlines tree info)
+ 	 ;; Call options filters and update export options.  We do not
+ 	 ;; use `org-export-filter-apply-functions' here since the
+ 	 ;; arity of such filters is different.
+-- 
+2.0.0
+
